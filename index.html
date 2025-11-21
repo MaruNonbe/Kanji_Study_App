@@ -1,0 +1,862 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1.0" />
+  <title>漢字置き換えドリル</title>
+
+  <style>
+    /* 子ども向け丸フォント */
+    @import url("https://fonts.googleapis.com/css2?family=M+PLUS+Rounded+1c:wght@400;500;700&display=swap");
+
+    :root {
+      --bg: #f7f4ef;
+      --card: #ffffff;
+      --ink: #333333;
+      --muted: #777777;
+      --primary: #77c4ff;
+      --primary-ink: #003b73;
+      --ok: #55d187;
+      --ok-ink: #003b30;
+      --warn: #ff8f8f;
+      --border-soft: #e0d8cc;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      padding: 16px;
+      background: var(--bg);
+      color: var(--ink);
+      font-family: "M PLUS Rounded 1c", system-ui, -apple-system,
+        BlinkMacSystemFont, "Segoe UI", sans-serif;
+      line-height: 1.6;
+    }
+
+    .wrap { max-width: 1100px; margin: 0 auto; }
+
+    .card {
+      background: var(--card);
+      border-radius: 20px;
+      padding: 18px 20px 20px;
+      box-shadow: 0 8px 20px rgba(0,0,0,0.06);
+      border: 1px solid #eadfd0;
+    }
+
+    header {
+      display:flex;
+      justify-content:space-between;
+      gap:16px;
+      align-items:flex-start;
+      flex-wrap:wrap;
+      margin-bottom:12px;
+    }
+
+    h1 {
+      margin: 0 0 4px;
+      font-size: 22px;
+    }
+    h1 small {
+      font-size: 13px;
+      color: var(--muted);
+      font-weight: 400;
+    }
+
+    h2 {
+      font-size: 17px;
+      margin: 10px 0 8px;
+    }
+
+    .muted { color: var(--muted); }
+
+    .toolbar {
+      display:flex;
+      flex-wrap:wrap;
+      gap:6px;
+      justify-content:flex-end;
+    }
+
+    label.btn, button {
+      border: none;
+      border-radius: 14px;
+      padding: 8px 13px;
+      font-size: 13px;
+      font-weight: 600;
+      cursor: pointer;
+      background: var(--primary);
+      color: var(--primary-ink);
+      display:inline-flex;
+      align-items:center;
+      gap:4px;
+      transition: transform 0.05s ease, box-shadow 0.05s ease, background 0.1s;
+    }
+
+    button.ghost, label.btn.ghost {
+      background:#e3e9f2;
+      color:#444;
+    }
+    button.ok { background: var(--ok); color: var(--ok-ink); }
+    button.warn { background: var(--warn); color: #fff; }
+
+    button:active, label.btn:active {
+      transform: translateY(1px);
+      box-shadow:none;
+    }
+
+    input.sr { display:none; }
+
+    .grid {
+      display:grid;
+      gap:18px;
+    }
+    .cols-2 {
+      grid-template-columns: minmax(0, 3fr) minmax(0, 2.5fr);
+    }
+
+    @media (max-width: 800px) {
+      .cols-2 { grid-template-columns: 1fr; }
+    }
+
+    .panel { }
+
+    .sentence {
+      min-height: 52px;
+      padding: 8px 10px;
+      border-radius: 12px;
+      background:#faf7f1;
+      border:1px dashed #e1d6c7;
+      font-size: 18px;
+    }
+
+    .answer-row {
+      display:flex;
+      gap:8px;
+      margin-top:8px;
+      align-items:center;
+    }
+
+    input[type="text"] {
+      flex:1;
+      padding:10px 12px;
+      border-radius:14px;
+      border:2px solid #ddd0c2;
+      font-size:18px;
+      background:#fff;
+      color:var(--ink);
+    }
+
+    .row {
+      display:flex;
+      gap:8px;
+      align-items:center;
+      flex-wrap:wrap;
+    }
+
+    .item-img {
+      width:100%;
+      min-height:150px;
+      border-radius:16px;
+      background:#fafafa;
+      border:2px dashed #e2d8cc;
+      display:grid;
+      place-items:center;
+      margin:6px 0 10px;
+      overflow:hidden;
+    }
+
+    .item-img img {
+      max-width:100%;
+      max-height:100%;
+      display:block;
+    }
+
+    .tags {
+      display:flex;
+      gap:6px;
+      flex-wrap:wrap;
+      margin-top:8px;
+      min-height:20px;
+    }
+
+    .tag {
+      padding:4px 9px;
+      border-radius:999px;
+      background:#e6f3ff;
+      color:#004f88;
+      font-size:11px;
+    }
+
+    .bubble {
+      margin-top:10px;
+      background:#fff8dc;
+      border-radius:14px;
+      border-left:6px solid #f7c948;
+      padding:8px 10px;
+      font-size:14px;
+      color:#5c4b20;
+    }
+
+    .grid5 {
+      display:grid;
+      grid-template-columns:repeat(5, minmax(0,1fr));
+      gap:8px;
+      margin-top:6px;
+    }
+
+    .trace-cell {
+      position:relative;
+      aspect-ratio:1;
+      border-radius:14px;
+      border:2px solid #e0d8cc;
+      background:#fff;
+      overflow:hidden;
+    }
+    .trace-cell canvas {
+      width:100%;
+      height:100%;
+      touch-action:none;
+      display:block;
+    }
+    .trace-faint {
+      position:absolute;
+      inset:0;
+      display:grid;
+      place-items:center;
+      color:#9fb3ff;
+      font-size:40px;
+      opacity:0.22;
+      pointer-events:none;
+    }
+
+    .list {
+      margin-top:8px;
+      border-radius:12px;
+      border:1px solid #e0d8cc;
+      max-height:220px;
+      overflow:auto;
+      background:#fff;
+    }
+    .list table {
+      width:100%;
+      border-collapse:collapse;
+      font-size:13px;
+    }
+    .list th, .list td {
+      padding:4px 6px;
+      border-bottom:1px solid #f1e6d8;
+    }
+    .list thead {
+      position:sticky;
+      top:0;
+      background:#f5ede1;
+      z-index:1;
+    }
+
+    .footer {
+      margin-top:14px;
+      padding-top:10px;
+      border-top:1px solid #e0d8cc;
+      font-size:12px;
+    }
+
+    .posture {
+      display:flex;
+      gap:8px;
+      align-items:center;
+      margin-bottom:6px;
+    }
+
+    .modal {
+      position:fixed;
+      inset:0;
+      display:none;
+      justify-content:center;
+      align-items:center;
+      background:rgba(0,0,0,0.35);
+      backdrop-filter:blur(2px);
+      z-index:50;
+    }
+
+    .paper {
+      background:#ffffff;
+      border-radius:18px;
+      padding:16px 18px;
+      max-width:640px;
+      width:calc(100% - 32px);
+      max-height:80vh;
+      overflow-y:auto;
+      border:1px solid #e0d8cc;
+      box-shadow:0 8px 18px rgba(0,0,0,0.15);
+      font-size:14px;
+    }
+
+    /* やさしいモードのとき、少し文字を大きく */
+    body.easy .sentence { font-size: 20px; }
+    body.easy input[type="text"] { font-size: 20px; }
+  </style>
+</head>
+<body>
+  <div class="wrap">
+    <div class="card">
+      <header>
+        <div>
+          <h1>漢字置き換えドリル <small>（やさしいモード・トレース対応）</small></h1>
+          <div class="muted" style="font-size:12px">
+            かなに<u>傍線</u> → 「漢字にしてください」｜音読＋指なぞり｜ディスグラフィア配慮
+          </div>
+        </div>
+        <div class="toolbar">
+          <!-- UIは残しつつ、機能は最小限 -->
+          <button id="btnDummyCsv" class="ghost">（準備中）CSV</button>
+          <button id="btnDummyStats" class="ghost">（準備中）統計</button>
+        </div>
+      </header>
+
+      <div class="grid cols-2">
+        <!-- 左：問題 -->
+        <section class="panel" id="left">
+          <h2>もんだい</h2>
+          <div class="item-img" id="imgBox">
+            <span class="muted">ここに え が でる よ（なくてもOK）</span>
+          </div>
+
+          <div class="sentence" id="sentence"></div>
+
+          <div class="answer-row">
+            <input id="answer" type="text" inputmode="text" autocomplete="off"
+              placeholder="ここに 漢字 を 入れてね" />
+            <button id="check" class="primary">こたえ あわせ</button>
+          </div>
+
+          <div class="row" style="margin-top:6px">
+            <button id="reveal" class="ghost">こたえ を みる</button>
+            <button id="tts" class="ghost">おんせい</button>
+            <button id="next" class="ok">つぎの もんだい</button>
+            <button id="again" class="warn">もう いちど</button>
+          </div>
+
+          <div class="trace-wrap" style="margin-top:10px">
+            <div class="row" style="justify-content:space-between">
+              <div class="muted" style="font-size:13px">
+                指で なぞる だけでも OK（てんさく なし）
+              </div>
+              <button id="clearTrace" class="ghost" style="font-size:11px;padding:4px 8px">なぞり を けす</button>
+            </div>
+            <div class="grid5" id="traceGrid"></div>
+          </div>
+
+          <div class="tags" id="tags"></div>
+          <div id="feedback" class="bubble" style="display:none"></div>
+        </section>
+
+        <!-- 右：モード・学年 -->
+        <aside class="panel" id="right">
+          <h2>セット / れんしゅうモード</h2>
+          <div class="row">
+            <button id="modeMixed" class="primary">ミックス</button>
+            <button id="modeSame" class="ghost">おなじ 漢字</button>
+          </div>
+
+          <div class="row" style="margin-top:8px">
+            <span class="muted" style="font-size:13px">出題数：</span>
+            <button data-q="5" class="ghost">5</button>
+            <button data-q="10" class="primary">10</button>
+            <button data-q="20" class="ghost">20</button>
+          </div>
+
+          <div class="row" style="margin-top:8px">
+            <span class="muted" style="font-size:13px">学年フィルタ：</span>
+            <select id="filterTag" style="border-radius:12px;border:1px solid #ddcebd;padding:6px 10px;font-size:13px">
+              <option value="">すべて</option>
+              <option value="小1">小1</option>
+              <option value="小2">小2</option>
+              <option value="小3">小3</option>
+              <option value="小4">小4</option>
+              <option value="小5">小5</option>
+              <option value="小6">小6</option>
+            </select>
+            <button id="clearFilter" class="ghost" style="font-size:11px;padding:4px 8px">クリア</button>
+          </div>
+
+          <h2 style="margin-top:10px">やさしいモード</h2>
+          <label class="row" style="font-size:13px;gap:8px">
+            <input type="checkbox" id="optEasy" />
+            文字を大きく＋よみあげ 自動
+          </label>
+
+          <h2 style="margin-top:12px">漢字リスト</h2>
+          <div class="list">
+            <table id="tbl">
+              <thead>
+                <tr><th>かな</th><th>漢字</th><th>文</th><th>画像</th></tr>
+              </thead>
+              <tbody></tbody>
+            </table>
+          </div>
+        </aside>
+      </div>
+    </div>
+
+    <!-- フッター -->
+    <div class="footer">
+      <div class="posture">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none"
+          stroke="currentColor" stroke-width="1.7">
+          <path d="M6 21h12M8 7h8M10 7v7M14 7v7M9 14l-2 3M15 14l2 3"/>
+        </svg>
+        <span class="muted">せすじ・紙は ななめ・左手で 紙を おさえる</span>
+      </div>
+      <div class="muted" style="display:flex;flex-wrap:wrap;gap:6px;align-items:center">
+        <span>© Freedom</span><span>｜</span>
+        <span>KanjiVG: CC BY-SA 3.0（改変あり）</span><span>｜</span>
+        <button id="btnLicenseFooter" class="ghost" style="font-size:11px;padding:4px 8px">ライセンス</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- ライセンスモーダル -->
+  <div class="modal" id="licenseModal">
+    <div class="paper">
+      <div class="row" style="justify-content:space-between;align-items:center">
+        <h3 style="margin:0;font-size:16px">ライセンス＆クレジット</h3>
+        <button id="closeLicense" class="ghost" style="font-size:11px;padding:4px 8px">とじる</button>
+      </div>
+      <p><strong>著作権者：</strong>Freedom</p>
+      <p>この教材は、学校・家庭などでの <strong>非営利利用</strong> を想定しています。配布・営利利用などを行う場合は、専門家への相談や、各データのライセンス条件をご確認ください。</p>
+      <hr>
+      <h4>参照データ</h4>
+      <ul>
+        <li>KanjiVG — CC BY-SA 3.0</li>
+        <li>その他、画像などは各ライセンスに従ってください。</li>
+      </ul>
+      <p class="muted" style="font-size:12px">このアプリのコードは例示であり、法的助言ではありません。</p>
+    </div>
+  </div>
+
+  <!-- 内蔵データ（KANJI_ITEMS） -->
+  <script src="kanji_items_all.js"></script>
+
+  <script>
+    /* =========================
+       設定：Google Apps Script API URL
+       ========================= */
+    const API_URL = "https://script.google.com/macros/s/AKfycby2ONfjn-yiAaq_R6ey4HvZG8aIhWf3sMWAuJHKs0hhzKZaqLUBLUs6XHy5W91OV9Zb/exec"; 
+    // 例: "https://script.google.com/macros/s/XXXXXXXXXXXX/exec"
+
+    /* =========================
+       小さなユーティリティ
+       ========================= */
+    const el  = (s, r = document) => r.querySelector(s);
+    const els = (s, r = document) => [...r.querySelectorAll(s)];
+    const uid = () => Math.random().toString(36).slice(2);
+
+    const storeKey = "kanji-drill-v3";
+
+    const state = {
+      items: [],
+      order: [],
+      idx: 0,
+      batch: 10,
+      mode: "mixed",
+      filter: "",
+      opt: { easy: false },
+      progress: {}
+    };
+
+    /* =========================
+       LocalStorage
+       ========================= */
+    function save() {
+      localStorage.setItem(storeKey, JSON.stringify({
+        items: state.items,
+        progress: state.progress,
+        opt: state.opt
+      }));
+    }
+
+    function load() {
+      try {
+        const d = JSON.parse(localStorage.getItem(storeKey) || "null");
+        if (d) {
+          if (Array.isArray(d.items)) state.items = d.items;
+          if (d.progress) state.progress = d.progress;
+          if (d.opt) state.opt = d.opt;
+        }
+      } catch(e) {
+        console.warn(e);
+      }
+      el("#optEasy").checked = !!state.opt.easy;
+      document.body.classList.toggle("easy", !!state.opt.easy);
+    }
+
+    /* =========================
+       KANJI_ITEMS / Sheet → 内部形式へ変換
+       ========================= */
+    function mapSourceToItem(src) {
+      const kana = src.kanji_reading || "";
+      const sentence = src.tts_sentence || "";
+      const tagList = [];
+
+      if (src.grade) tagList.push(String(src.grade));
+      if (src.tags)  tagList.push(String(src.tags));
+
+      return {
+        id: uid(),
+        kana,
+        kanji: String(src.kanji || ""),
+        sentence,
+        image: "",      // 必要になったら拡張
+        tags: tagList
+      };
+    }
+
+    function initFromKanjiItemsIfNeeded() {
+      if (state.items.length > 0) return;
+      if (typeof KANJI_ITEMS === "undefined") return;
+      state.items = KANJI_ITEMS.map(mapSourceToItem);
+    }
+
+    async function syncFromSheet() {
+      if (!API_URL || API_URL.startsWith("★")) {
+        console.log("API_URL が設定されていないため、シート同期はスキップします。");
+        return;
+      }
+      try {
+        const res = await fetch(API_URL);
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        const data = await res.json();
+        if (!data || !Array.isArray(data.items)) {
+          console.warn("不正なJSON形式:", data);
+          return;
+        }
+        state.items = data.items.map(mapSourceToItem);
+        save();
+        renderTable();
+        setupNewSession();
+        console.log("Google Sheets から最新データを読み込みました。件数:", state.items.length);
+      } catch (e) {
+        console.error("シート同期に失敗しました。内蔵データを使用します。", e);
+      }
+    }
+
+    /* =========================
+       学年フィルタ
+       ========================= */
+    function filteredItems() {
+      const g = state.filter;
+      if (!g) return state.items;
+      return state.items.filter(it =>
+        Array.isArray(it.tags) && it.tags.includes(g)
+      );
+    }
+
+    /* =========================
+       テーブル表示
+       ========================= */
+    function renderTable() {
+      const tb = el("#tbl tbody");
+      tb.innerHTML = "";
+      filteredItems().forEach(it => {
+        const tr = document.createElement("tr");
+        tr.innerHTML = `
+          <td>${it.kana}</td>
+          <td>${it.kanji}</td>
+          <td>${it.sentence}</td>
+          <td>${it.image ? "✓" : ""}</td>
+        `;
+        tb.appendChild(tr);
+      });
+    }
+
+    /* =========================
+       セット作成 / 出題
+       ========================= */
+    function shuffle(a) {
+      return a.map(x => [Math.random(), x])
+        .sort((a,b)=>a[0]-b[0])
+        .map(x=>x[1]);
+    }
+
+    function pickBatch() {
+      const pool = filteredItems();
+      if (!pool.length) {
+        state.order = [];
+        state.idx = 0;
+        return;
+      }
+      let list = pool;
+      if (state.mode === "same") {
+        const seed = pool[Math.floor(Math.random()*pool.length)];
+        list = pool.filter(it => it.kanji === seed.kanji);
+      }
+      const sh = shuffle(list);
+      state.order = sh.slice(0, state.batch).map(it => it.id);
+      state.idx = 0;
+    }
+
+    function currentItem() {
+      const id = state.order[state.idx];
+      return state.items.find(x => x.id === id);
+    }
+
+    function underline(sentence, kana) {
+      if (!sentence || !kana) return sentence || "";
+      const s = String(sentence);
+      const k = String(kana);
+      const idx = s.indexOf(k);
+      if (idx < 0) return s;
+      return s.slice(0, idx) + "<u>" + s.slice(idx, idx + k.length) + "</u>" + s.slice(idx + k.length);
+    }
+
+    function renderCurrent() {
+      const it = currentItem();
+      if (!it) {
+        el("#sentence").innerHTML =
+          `<span class="muted">右で 出題数 と 学年 をえらんで、「つぎの もんだい」を おしてね。</span>`;
+        el("#imgBox").innerHTML =
+          `<span class="muted">ここに え が でる よ（なくてもOK）</span>`;
+        el("#tags").innerHTML = "";
+        el("#answer").value = "";
+        el("#feedback").style.display = "none";
+        renderTrace("");
+        return;
+      }
+
+      el("#sentence").innerHTML = underline(it.sentence, it.kana);
+
+      el("#imgBox").innerHTML = it.image
+        ? `<img src="${it.image}" alt="">`
+        : `<span class="muted">え は なし</span>`;
+
+      el("#tags").innerHTML = (it.tags || [])
+        .map(t => `<span class="tag">${t}</span>`).join("");
+
+      el("#answer").value = "";
+      el("#feedback").style.display = "none";
+      renderTrace(it.kanji);
+
+      // 🔊 やさしいモード：自動読み上げ
+      if (state.opt.easy && "speechSynthesis" in window) {
+        const u = new SpeechSynthesisUtterance(`${it.kana}。${it.sentence}`);
+        u.lang = "ja-JP";
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(u);
+      }
+    }
+
+    function check(showOnly = false) {
+      const it = currentItem();
+      if (!it) return;
+      const ans = el("#answer").value.trim();
+      const ok = ans === it.kanji;
+      const box = el("#feedback");
+
+      if (showOnly) {
+        box.innerHTML = `こたえ：<strong style="font-size:20px">${it.kanji}</strong>　<small class="muted">（${it.kana}）</small>`;
+        box.style.display = "block";
+        return;
+      }
+
+      if (ok) {
+        box.innerHTML = `◎ いいね！ <strong style="font-size:20px">${it.kanji}</strong> を しっかり おぼえたね。`;
+      } else {
+        box.innerHTML = `× <strong>${ans || "（まだ かいていない よ）"}</strong> → せいかい は <strong style="font-size:20px">${it.kanji}</strong> だよ。`;
+      }
+      box.style.display = "block";
+    }
+
+    function nextItem(retry=false) {
+      if (retry) {
+        renderCurrent();
+        return;
+      }
+      if (state.idx < state.order.length - 1) {
+        state.idx++;
+        renderCurrent();
+      } else {
+        el("#sentence").innerHTML = `<strong>おつかれさま！</strong> きょう は ここまで でも だいじょうぶ。`;
+        el("#imgBox").innerHTML = `<span class="muted">✓ かんりょう</span>`;
+        el("#tags").innerHTML = "";
+        el("#feedback").style.display = "none";
+      }
+    }
+
+    /* =========================
+       トレース
+       ========================= */
+    let traceCanvases = [];
+
+    function renderTrace(ch) {
+      const grid = el("#traceGrid");
+      grid.innerHTML = "";
+      traceCanvases = [];
+      for (let i=0; i<5; i++) {
+        const cell = document.createElement("div");
+        cell.className = "trace-cell";
+        const canv = document.createElement("canvas");
+        cell.appendChild(canv);
+        if (ch) {
+          const faint = document.createElement("div");
+          faint.className = "trace-faint";
+          faint.textContent = ch;
+          cell.appendChild(faint);
+        }
+        grid.appendChild(cell);
+        setupCanvas(canv);
+      }
+    }
+
+    function setupCanvas(c) {
+      const dpr = window.devicePixelRatio || 1;
+      const s = c.parentElement.getBoundingClientRect();
+      c.width = s.width * dpr;
+      c.height = s.height * dpr;
+      const ctx = c.getContext("2d");
+      ctx.lineWidth = 5 * dpr;
+      ctx.lineCap = "round";
+      ctx.strokeStyle = "#7fb3ff";
+
+      let drawing = false;
+
+      function pos(e) {
+        const r = c.getBoundingClientRect();
+        if (e.touches) {
+          const t = e.touches[0];
+          return [(t.clientX - r.left)*dpr, (t.clientY - r.top)*dpr];
+        }
+        return [(e.clientX - r.left)*dpr, (e.clientY - r.top)*dpr];
+      }
+
+      function start(e) {
+        drawing = true;
+        const [x,y] = pos(e);
+        ctx.beginPath();
+        ctx.moveTo(x,y);
+        e.preventDefault();
+      }
+      function move(e) {
+        if (!drawing) return;
+        const [x,y] = pos(e);
+        ctx.lineTo(x,y);
+        ctx.stroke();
+        e.preventDefault();
+      }
+      function end() { drawing = false; }
+
+      c.addEventListener("mousedown", start);
+      c.addEventListener("mousemove", move);
+      window.addEventListener("mouseup", end);
+      c.addEventListener("touchstart", start, {passive:false});
+      c.addEventListener("touchmove", move, {passive:false});
+      c.addEventListener("touchend", end);
+
+      traceCanvases.push(c);
+    }
+
+    el("#clearTrace").addEventListener("click", () => {
+      traceCanvases.forEach(c => {
+        const ctx = c.getContext("2d");
+        ctx.clearRect(0,0,c.width,c.height);
+      });
+    });
+
+    /* =========================
+       イベント接続
+       ========================= */
+    el("#check").addEventListener("click", () => check(false));
+    el("#reveal").addEventListener("click", () => check(true));
+    el("#next").addEventListener("click", () => nextItem(false));
+    el("#again").addEventListener("click", () => nextItem(true));
+
+    el("#tts").addEventListener("click", () => {
+      const it = currentItem();
+      if (!it || !("speechSynthesis" in window)) return;
+      const u = new SpeechSynthesisUtterance(`${it.kana}。${it.sentence}`);
+      u.lang = "ja-JP";
+      window.speechSynthesis.cancel();
+      window.speechSynthesis.speak(u);
+    });
+
+    els("[data-q]").forEach(btn => {
+      btn.addEventListener("click", () => {
+        state.batch = Number(btn.getAttribute("data-q")) || 10;
+        els("[data-q]").forEach(b => b.classList.remove("primary"));
+        btn.classList.add("primary");
+        pickBatch();
+        renderCurrent();
+      });
+    });
+
+    el("#modeMixed").addEventListener("click", () => {
+      state.mode = "mixed";
+      el("#modeMixed").classList.add("primary");
+      el("#modeSame").classList.remove("primary");
+      pickBatch();
+      renderCurrent();
+    });
+    el("#modeSame").addEventListener("click", () => {
+      state.mode = "same";
+      el("#modeSame").classList.add("primary");
+      el("#modeMixed").classList.remove("primary");
+      pickBatch();
+      renderCurrent();
+    });
+
+    el("#filterTag").addEventListener("change", () => {
+      state.filter = el("#filterTag").value || "";
+      renderTable();
+      pickBatch();
+      renderCurrent();
+    });
+    el("#clearFilter").addEventListener("click", () => {
+      state.filter = "";
+      el("#filterTag").value = "";
+      renderTable();
+      pickBatch();
+      renderCurrent();
+    });
+
+    el("#optEasy").addEventListener("change", (e) => {
+      state.opt.easy = !!e.target.checked;
+      document.body.classList.toggle("easy", state.opt.easy);
+      save();
+    });
+
+    // ダミーボタン（簡略化バージョンにつき準備中）
+    el("#btnDummyCsv").addEventListener("click", () => {
+      alert("CSV 読み込み機能は、この かんたん版 では まだ つかっていません。\n（Google Sheets と じどう同期します）");
+    });
+    el("#btnDummyStats").addEventListener("click", () => {
+      alert("統計画面は、つぎの バージョンで 追加よてい です。");
+    });
+
+    // ライセンスモーダル
+    el("#btnLicenseFooter").addEventListener("click", () => {
+      el("#licenseModal").style.display = "flex";
+    });
+    el("#closeLicense").addEventListener("click", () => {
+      el("#licenseModal").style.display = "none";
+    });
+    el("#licenseModal").addEventListener("click", (e) => {
+      if (e.target.id === "licenseModal") {
+        el("#licenseModal").style.display = "none";
+      }
+    });
+
+    /* =========================
+       初期化
+       ========================= */
+    document.addEventListener("DOMContentLoaded", async () => {
+      load();                         // 保存データ
+      initFromKanjiItemsIfNeeded();   // 内蔵 KANJI_ITEMS
+      renderTable();
+      pickBatch();
+      renderCurrent();
+
+      // Google Sheets から最新データを上書き
+      await syncFromSheet();
+    });
+  </script>
+</body>
+</html>
