@@ -118,8 +118,6 @@
       .cols-2 { grid-template-columns: 1fr; }
     }
 
-    .panel { }
-
     .sentence {
       min-height: 52px;
       padding: 8px 10px;
@@ -305,49 +303,49 @@
       }
     }
 
-    /* ===== 正解アニメーションオーバーレイ ===== */
+    /* ===== 正解オーバーレイ ===== */
     #correctOverlay {
-      position: fixed;
-      inset: 0;
-      display: none;
-      justify-content: center;
-      align-items: center;
-      flex-direction: column;
-      z-index: 100;
-      pointer-events: none;
-      background: rgba(255, 255, 255, 0.0);
+      position:fixed;
+      inset:0;
+      display:none;
+      align-items:center;
+      justify-content:center;
+      pointer-events:none;
+      z-index:100;
+      background:rgba(255,255,255,0.0);
     }
-
     #correctOverlay.show {
-      display: flex;
+      display:flex;
       animation: co-fade 900ms ease-out forwards;
     }
-
     .co-ring {
-      font-size: min(40vw, 220px);
-      color: #4fd17d;
-      text-shadow: 0 0 12px rgba(0,0,0,0.15);
-      animation: co-pop 600ms cubic-bezier(.3,1.6,.4,1);
+      font-size:120px;
+      color:#4ad37f;
+      text-shadow:0 0 15px rgba(0,0,0,0.25);
+      transform:scale(0.2);
+      animation: co-pop 900ms ease-out forwards;
     }
-
     .co-text {
-      margin-top: 8px;
-      font-size: min(10vw, 40px);
-      color: #008b4b;
-      font-weight: 700;
-      text-shadow: 0 0 8px rgba(255,255,255,0.8);
+      margin-top:16px;
+      font-size:32px;
+      color:#333;
+      opacity:0;
+      animation: co-text 900ms ease-out forwards;
     }
-
     @keyframes co-pop {
-      0%   { transform: scale(0);   opacity: 0; }
-      40%  { transform: scale(1.1); opacity: 1; }
-      100% { transform: scale(1);   opacity: 1; }
+      0% { transform:scale(0.2); opacity:0; }
+      40%{ transform:scale(1.1); opacity:1; }
+      100%{ transform:scale(1.0); opacity:1; }
     }
-
+    @keyframes co-text {
+      0% { opacity:0; transform:translateY(8px); }
+      50%{ opacity:1; transform:translateY(0); }
+      100%{ opacity:1; transform:translateY(0); }
+    }
     @keyframes co-fade {
-      0%   { opacity: 1; }
-      70%  { opacity: 1; }
-      100% { opacity: 0; }
+      0% { opacity:0; }
+      20%{ opacity:1; }
+      100%{ opacity:0; }
     }
   </style>
 </head>
@@ -492,6 +490,14 @@
     </div>
   </div>
 
+  <!-- 正解オーバーレイ -->
+  <div id="correctOverlay">
+    <div>
+      <div class="co-ring">〇</div>
+      <div class="co-text">せいかい！</div>
+    </div>
+  </div>
+
   <!-- 内蔵データ（KANJI_ITEMS） -->
   <script src="kanji_items_all.js"></script>
 
@@ -500,9 +506,11 @@
        設定：Google Apps Script API URL
        ========================= */
     const API_URL = "https://script.google.com/macros/s/AKfycby2ONfjn-yiAaq_R6ey4HvZG8aIhWf3sMWAuJHKs0hhzKZaqLUBLUs6XHy5W91OV9Zb/exec";
+    // 例: "https://script.google.com/macros/s/XXXXXXXXXXXX/exec"
+    // 未設定の場合は KANJI_ITEMS（ローカル）だけで動作します。
 
     /* =========================
-       小さなユーティリティ
+       ユーティリティ
        ========================= */
     const el  = (s, r = document) => r.querySelector(s);
     const els = (s, r = document) => [...r.querySelectorAll(s)];
@@ -521,9 +529,6 @@
       progress: {}
     };
 
-    /* =========================
-       LocalStorage
-       ========================= */
     function save() {
       localStorage.setItem(storeKey, JSON.stringify({
         items: state.items,
@@ -548,10 +553,64 @@
     }
 
     /* =========================
+       かな正規化＆下線処理
+       ========================= */
+    function normalizeKana(str) {
+      if (!str) return "";
+      return String(str)
+        // カタカナ→ひらがな
+        .replace(/[\u30A1-\u30FA]/g, ch =>
+          String.fromCharCode(ch.charCodeAt(0) - 0x60)
+        )
+        .replace(/\u30F4/g, "\u3094") // ヴ→ゔ
+        // 空白・句読点など無視
+        .replace(/[ 　\t\r\n、。,.]/g, "");
+    }
+
+    function underline(sentence, kana) {
+      if (!sentence || !kana) return sentence || "";
+      const sOri = String(sentence);
+      const sNorm = normalizeKana(sOri);
+      const kNorm = normalizeKana(kana);
+
+      const idxNorm = sNorm.indexOf(kNorm);
+      if (idxNorm < 0) return sOri; // 見つからない場合はそのまま
+
+      let count = 0;
+      let startReal = -1;
+      let endReal = -1;
+
+      for (let i = 0; i < sOri.length; i++) {
+        const ch = sOri[i];
+        const skip = /[ 　\t\r\n、。,.]/.test(ch);
+        if (skip) continue;
+
+        if (count === idxNorm && startReal === -1) {
+          startReal = i;
+        }
+        if (count === idxNorm + kNorm.length - 1) {
+          endReal = i + 1;
+          break;
+        }
+        count++;
+      }
+
+      if (startReal === -1 || endReal === -1) return sOri;
+
+      return (
+        sOri.slice(0, startReal) +
+        "<u>" +
+        sOri.slice(startReal, endReal) +
+        "</u>" +
+        sOri.slice(endReal)
+      );
+    }
+
+    /* =========================
        KANJI_ITEMS / Sheet → 内部形式へ変換
        ========================= */
     function mapSourceToItem(src) {
-      const kana = src.kanji_reading || "";
+      const kana = (src.kanji_reading || "").trim();
       const sentence = src.tts_sentence || "";
       const tagList = [];
 
@@ -563,7 +622,7 @@
         kana,
         kanji: String(src.kanji || ""),
         sentence,
-        image: "",
+        image: "",      // 必要になったら拡張
         tags: tagList
       };
     }
@@ -576,7 +635,7 @@
 
     async function syncFromSheet() {
       if (!API_URL || API_URL.startsWith("★")) {
-        console.log("API_URL が設定されていないため、シート同期はスキップします。");
+        console.log("API_URL が未設定のため、シート同期はスキップします（ローカルデータのみ）。");
         return;
       }
       try {
@@ -662,15 +721,6 @@
       return state.items.find(x => x.id === id);
     }
 
-    function underline(sentence, kana) {
-      if (!sentence || !kana) return sentence || "";
-      const s = String(sentence);
-      const k = String(kana);
-      const idx = s.indexOf(k);
-      if (idx < 0) return s;
-      return s.slice(0, idx) + "<u>" + s.slice(idx, idx + k.length) + "</u>" + s.slice(idx + k.length);
-    }
-
     function renderCurrent() {
       const it = currentItem();
       if (!it) {
@@ -707,18 +757,11 @@
       }
     }
 
-    /* 正解オーバーレイ表示 */
     function showCorrectOverlay() {
       const ov = el("#correctOverlay");
       if (!ov) return;
-
-      ov.classList.remove("show");
-      void ov.offsetWidth;  // reflow
       ov.classList.add("show");
-
-      setTimeout(() => {
-        ov.classList.remove("show");
-      }, 900);
+      setTimeout(() => ov.classList.remove("show"), 900);
     }
 
     function check(showOnly = false) {
@@ -736,7 +779,6 @@
 
       if (ok) {
         box.innerHTML = `◎ いいね！ <strong style="font-size:20px">${it.kanji}</strong> を しっかり おぼえたね。`;
-        // 正解演出
         showCorrectOverlay();
       } else {
         box.innerHTML = `× <strong>${ans || "（まだ かいていない よ）"}</strong> → せいかい は <strong style="font-size:20px">${it.kanji}</strong> だよ。`;
@@ -819,112 +861,105 @@
       faint.textContent = ch ? ch : "";
     }
 
-    el("#clearTrace").addEventListener("click", () => {
-      if (!traceCanvas || !traceCtx) return;
-      traceCtx.clearRect(0,0,traceCanvas.width,traceCanvas.height);
-    });
-
     /* =========================
-       イベント接続
-       ========================= */
-    el("#check").addEventListener("click", () => check(false));
-    el("#reveal").addEventListener("click", () => check(true));
-    el("#next").addEventListener("click", () => nextItem(false));
-    el("#again").addEventListener("click", () => nextItem(true));
-
-    el("#tts").addEventListener("click", () => {
-      const it = currentItem();
-      if (!it || !("speechSynthesis" in window)) return;
-      const u = new SpeechSynthesisUtterance(`${it.kana}。${it.sentence}`);
-      u.lang = "ja-JP";
-      window.speechSynthesis.cancel();
-      window.speechSynthesis.speak(u);
-    });
-
-    els("[data-q]").forEach(btn => {
-      btn.addEventListener("click", () => {
-        state.batch = Number(btn.getAttribute("data-q")) || 10;
-        els("[data-q]").forEach(b => b.classList.remove("primary"));
-        btn.classList.add("primary");
-        pickBatch();
-        renderCurrent();
-      });
-    });
-
-    el("#modeMixed").addEventListener("click", () => {
-      state.mode = "mixed";
-      el("#modeMixed").classList.add("primary");
-      el("#modeSame").classList.remove("primary");
-      pickBatch();
-      renderCurrent();
-    });
-    el("#modeSame").addEventListener("click", () => {
-      state.mode = "same";
-      el("#modeSame").classList.add("primary");
-      el("#modeMixed").classList.remove("primary");
-      pickBatch();
-      renderCurrent();
-    });
-
-    el("#filterTag").addEventListener("change", () => {
-      state.filter = el("#filterTag").value || "";
-      renderTable();
-      pickBatch();
-      renderCurrent();
-    });
-    el("#clearFilter").addEventListener("click", () => {
-      state.filter = "";
-      el("#filterTag").value = "";
-      renderTable();
-      pickBatch();
-      renderCurrent();
-    });
-
-    el("#optEasy").addEventListener("change", (e) => {
-      state.opt.easy = !!e.target.checked;
-      document.body.classList.toggle("easy", state.opt.easy);
-      save();
-    });
-
-    // ダミーボタン（簡略化バージョンにつき準備中）
-    el("#btnDummyCsv").addEventListener("click", () => {
-      alert("CSV 読み込み機能は、この かんたん版 では まだ つかっていません。\n（Google Sheets と じどう同期します）");
-    });
-    el("#btnDummyStats").addEventListener("click", () => {
-      alert("統計画面は、つぎの バージョンで 追加よてい です。");
-    });
-
-    // ライセンスモーダル
-    el("#btnLicenseFooter").addEventListener("click", () => {
-      el("#licenseModal").style.display = "flex";
-    });
-    el("#closeLicense").addEventListener("click", () => {
-      el("#licenseModal").style.display = "none";
-    });
-    el("#licenseModal").addEventListener("click", (e) => {
-      if (e.target.id === "licenseModal") {
-        el("#licenseModal").style.display = "none";
-      }
-    });
-
-    /* =========================
-       初期化
+       DOMイベント結線
        ========================= */
     document.addEventListener("DOMContentLoaded", async () => {
       initTraceCanvas();
       load();
       initFromKanjiItemsIfNeeded();
       renderTable();
-      pickBatch();
-      renderCurrent();
+      setupNewSession();
+
+      // Google Sheets から最新データを上書き（任意）
       await syncFromSheet();
+
+      el("#check").addEventListener("click", () => check(false));
+      el("#reveal").addEventListener("click", () => check(true));
+      el("#next").addEventListener("click", () => nextItem(false));
+      el("#again").addEventListener("click", () => nextItem(true));
+
+      el("#tts").addEventListener("click", () => {
+        const it = currentItem();
+        if (!it || !("speechSynthesis" in window)) return;
+        const u = new SpeechSynthesisUtterance(`${it.kana}。${it.sentence}`);
+        u.lang = "ja-JP";
+        window.speechSynthesis.cancel();
+        window.speechSynthesis.speak(u);
+      });
+
+      els("[data-q]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          state.batch = Number(btn.getAttribute("data-q")) || 10;
+          els("[data-q]").forEach(b => b.classList.remove("primary"));
+          btn.classList.add("primary");
+          pickBatch();
+          renderCurrent();
+        });
+      });
+
+      el("#modeMixed").addEventListener("click", () => {
+        state.mode = "mixed";
+        el("#modeMixed").classList.add("primary");
+        el("#modeSame").classList.remove("primary");
+        pickBatch();
+        renderCurrent();
+      });
+      el("#modeSame").addEventListener("click", () => {
+        state.mode = "same";
+        el("#modeSame").classList.add("primary");
+        el("#modeMixed").classList.remove("primary");
+        pickBatch();
+        renderCurrent();
+      });
+
+      el("#filterTag").addEventListener("change", () => {
+        state.filter = el("#filterTag").value || "";
+        renderTable();
+        pickBatch();
+        renderCurrent();
+      });
+      el("#clearFilter").addEventListener("click", () => {
+        state.filter = "";
+        el("#filterTag").value = "";
+        renderTable();
+        pickBatch();
+        renderCurrent();
+      });
+
+      el("#optEasy").addEventListener("change", (e) => {
+        state.opt.easy = !!e.target.checked;
+        document.body.classList.toggle("easy", state.opt.easy);
+        save();
+      });
+
+      // ダミーボタン
+      el("#btnDummyCsv").addEventListener("click", () => {
+        alert("CSV 読み込み機能は、この かんたん版 では まだ つかっていません。\n（Google Sheets と じどう同期します）");
+      });
+      el("#btnDummyStats").addEventListener("click", () => {
+        alert("統計画面は、つぎの バージョンで 追加よてい です。");
+      });
+
+      // ライセンスモーダル
+      el("#btnLicenseFooter").addEventListener("click", () => {
+        el("#licenseModal").style.display = "flex";
+      });
+      el("#closeLicense").addEventListener("click", () => {
+        el("#licenseModal").style.display = "none";
+      });
+      el("#licenseModal").addEventListener("click", (e) => {
+        if (e.target.id === "licenseModal") {
+          el("#licenseModal").style.display = "none";
+        }
+      });
+
+      // なぞり消去
+      el("#clearTrace").addEventListener("click", () => {
+        if (!traceCanvas || !traceCtx) return;
+        traceCtx.clearRect(0,0,traceCanvas.width,traceCanvas.height);
+      });
     });
   </script>
-
-  <!-- 正解オーバーレイ -->
-  <div id="correctOverlay">
-    <div class="co-ring">〇</div>
-    <div class="co-text">せいかい！</div>
-  </div>
 </body>
 </html>
