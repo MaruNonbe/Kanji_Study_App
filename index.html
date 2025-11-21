@@ -197,38 +197,6 @@
       color:#5c4b20;
     }
 
-    .grid5 {
-      display:grid;
-      grid-template-columns:repeat(5, minmax(0,1fr));
-      gap:8px;
-      margin-top:6px;
-    }
-
-    .trace-cell {
-      position:relative;
-      aspect-ratio:1;
-      border-radius:14px;
-      border:2px solid #e0d8cc;
-      background:#fff;
-      overflow:hidden;
-    }
-    .trace-cell canvas {
-      width:100%;
-      height:100%;
-      touch-action:none;
-      display:block;
-    }
-    .trace-faint {
-      position:absolute;
-      inset:0;
-      display:grid;
-      place-items:center;
-      color:#9fb3ff;
-      font-size:40px;
-      opacity:0.22;
-      pointer-events:none;
-    }
-
     .list {
       margin-top:8px;
       border-radius:12px;
@@ -294,6 +262,48 @@
     /* やさしいモードのとき、少し文字を大きく */
     body.easy .sentence { font-size: 20px; }
     body.easy input[type="text"] { font-size: 20px; }
+
+    /* ===== 大きなトレース枠 ===== */
+    .trace-wrap {
+      margin-top:10px;
+    }
+
+    #traceArea {
+      position:relative;
+      width:100%;
+      max-width:420px;
+      margin-top:8px;
+      aspect-ratio:1/1;
+      border-radius:16px;
+      border:2px solid #e0d8cc;
+      background:#ffffff;
+      overflow:hidden;
+    }
+
+    #traceCanvas {
+      width:100%;
+      height:100%;
+      display:block;
+      touch-action:none;
+    }
+
+    #traceFaint {
+      position:absolute;
+      inset:0;
+      display:grid;
+      place-items:center;
+      font-size:72px;
+      color:#9fb3ff;
+      opacity:0.22;
+      pointer-events:none;
+    }
+
+    @media (max-width: 600px) {
+      #traceArea {
+        max-width:none;
+        height:auto;
+      }
+    }
   </style>
 </head>
 <body>
@@ -336,14 +346,17 @@
             <button id="again" class="warn">もう いちど</button>
           </div>
 
-          <div class="trace-wrap" style="margin-top:10px">
+          <div class="trace-wrap">
             <div class="row" style="justify-content:space-between">
               <div class="muted" style="font-size:13px">
                 指で なぞる だけでも OK（てんさく なし）
               </div>
               <button id="clearTrace" class="ghost" style="font-size:11px;padding:4px 8px">なぞり を けす</button>
             </div>
-            <div class="grid5" id="traceGrid"></div>
+            <div id="traceArea">
+              <canvas id="traceCanvas"></canvas>
+              <div id="traceFaint"></div>
+            </div>
           </div>
 
           <div class="tags" id="tags"></div>
@@ -595,6 +608,11 @@
       state.idx = 0;
     }
 
+    function setupNewSession() {
+      pickBatch();
+      renderCurrent();
+    }
+
     function currentItem() {
       const id = state.order[state.idx];
       return state.items.find(x => x.id === id);
@@ -683,82 +701,68 @@
     }
 
     /* =========================
-       トレース
+       大きな1つのトレースキャンバス
        ========================= */
-    let traceCanvases = [];
+    let traceCanvas, traceCtx, traceDpr = window.devicePixelRatio || 1;
+    let traceDrawing = false;
 
-    function renderTrace(ch) {
-      const grid = el("#traceGrid");
-      grid.innerHTML = "";
-      traceCanvases = [];
-      for (let i=0; i<5; i++) {
-        const cell = document.createElement("div");
-        cell.className = "trace-cell";
-        const canv = document.createElement("canvas");
-        cell.appendChild(canv);
-        if (ch) {
-          const faint = document.createElement("div");
-          faint.className = "trace-faint";
-          faint.textContent = ch;
-          cell.appendChild(faint);
-        }
-        grid.appendChild(cell);
-        setupCanvas(canv);
+    function initTraceCanvas() {
+      traceCanvas = el("#traceCanvas");
+      if (!traceCanvas) return;
+      traceCtx = traceCanvas.getContext("2d");
+
+      function resizeCanvas() {
+        const rect = traceCanvas.getBoundingClientRect();
+        traceCanvas.width  = rect.width * traceDpr;
+        traceCanvas.height = rect.height * traceDpr;
+        traceCtx.lineCap = "round";
+        traceCtx.lineJoin = "round";
+        traceCtx.lineWidth = 5 * traceDpr;
+        traceCtx.strokeStyle = "#7fb3ff";
       }
+      resizeCanvas();
+      window.addEventListener("resize", resizeCanvas);
+
+      function getPos(ev) {
+        const rect = traceCanvas.getBoundingClientRect();
+        const x = (ev.clientX - rect.left) * traceDpr;
+        const y = (ev.clientY - rect.top) * traceDpr;
+        return { x, y };
+      }
+
+      traceCanvas.addEventListener("pointerdown", ev => {
+        traceCanvas.setPointerCapture(ev.pointerId);
+        traceDrawing = true;
+        const {x,y} = getPos(ev);
+        traceCtx.beginPath();
+        traceCtx.moveTo(x,y);
+      });
+      traceCanvas.addEventListener("pointermove", ev => {
+        if (!traceDrawing) return;
+        const {x,y} = getPos(ev);
+        traceCtx.lineTo(x,y);
+        traceCtx.stroke();
+      });
+      traceCanvas.addEventListener("pointerup", ev => {
+        traceDrawing = false;
+        traceCanvas.releasePointerCapture(ev.pointerId);
+      });
+      traceCanvas.addEventListener("pointercancel", () => {
+        traceDrawing = false;
+      });
     }
 
-    function setupCanvas(c) {
-      const dpr = window.devicePixelRatio || 1;
-      const s = c.parentElement.getBoundingClientRect();
-      c.width = s.width * dpr;
-      c.height = s.height * dpr;
-      const ctx = c.getContext("2d");
-      ctx.lineWidth = 5 * dpr;
-      ctx.lineCap = "round";
-      ctx.strokeStyle = "#7fb3ff";
-
-      let drawing = false;
-
-      function pos(e) {
-        const r = c.getBoundingClientRect();
-        if (e.touches) {
-          const t = e.touches[0];
-          return [(t.clientX - r.left)*dpr, (t.clientY - r.top)*dpr];
-        }
-        return [(e.clientX - r.left)*dpr, (e.clientY - r.top)*dpr];
-      }
-
-      function start(e) {
-        drawing = true;
-        const [x,y] = pos(e);
-        ctx.beginPath();
-        ctx.moveTo(x,y);
-        e.preventDefault();
-      }
-      function move(e) {
-        if (!drawing) return;
-        const [x,y] = pos(e);
-        ctx.lineTo(x,y);
-        ctx.stroke();
-        e.preventDefault();
-      }
-      function end() { drawing = false; }
-
-      c.addEventListener("mousedown", start);
-      c.addEventListener("mousemove", move);
-      window.addEventListener("mouseup", end);
-      c.addEventListener("touchstart", start, {passive:false});
-      c.addEventListener("touchmove", move, {passive:false});
-      c.addEventListener("touchend", end);
-
-      traceCanvases.push(c);
+    function renderTrace(ch) {
+      const faint = el("#traceFaint");
+      if (!traceCanvas || !traceCtx || !faint) return;
+      // キャンバスをクリア
+      traceCtx.clearRect(0,0,traceCanvas.width,traceCanvas.height);
+      faint.textContent = ch ? ch : "";
     }
 
     el("#clearTrace").addEventListener("click", () => {
-      traceCanvases.forEach(c => {
-        const ctx = c.getContext("2d");
-        ctx.clearRect(0,0,c.width,c.height);
-      });
+      if (!traceCanvas || !traceCtx) return;
+      traceCtx.clearRect(0,0,traceCanvas.width,traceCanvas.height);
     });
 
     /* =========================
@@ -848,8 +852,9 @@
        初期化
        ========================= */
     document.addEventListener("DOMContentLoaded", async () => {
-      load();                         // 保存データ
-      initFromKanjiItemsIfNeeded();   // 内蔵 KANJI_ITEMS
+      initTraceCanvas();             // 大きい書き枠
+      load();                        // 保存データ
+      initFromKanjiItemsIfNeeded();  // 内蔵 KANJI_ITEMS
       renderTable();
       pickBatch();
       renderCurrent();
