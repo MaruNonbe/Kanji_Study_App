@@ -304,6 +304,51 @@
         height:auto;
       }
     }
+
+    /* ===== 正解アニメーションオーバーレイ ===== */
+    #correctOverlay {
+      position: fixed;
+      inset: 0;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      flex-direction: column;
+      z-index: 100;
+      pointer-events: none;
+      background: rgba(255, 255, 255, 0.0);
+    }
+
+    #correctOverlay.show {
+      display: flex;
+      animation: co-fade 900ms ease-out forwards;
+    }
+
+    .co-ring {
+      font-size: min(40vw, 220px);
+      color: #4fd17d;
+      text-shadow: 0 0 12px rgba(0,0,0,0.15);
+      animation: co-pop 600ms cubic-bezier(.3,1.6,.4,1);
+    }
+
+    .co-text {
+      margin-top: 8px;
+      font-size: min(10vw, 40px);
+      color: #008b4b;
+      font-weight: 700;
+      text-shadow: 0 0 8px rgba(255,255,255,0.8);
+    }
+
+    @keyframes co-pop {
+      0%   { transform: scale(0);   opacity: 0; }
+      40%  { transform: scale(1.1); opacity: 1; }
+      100% { transform: scale(1);   opacity: 1; }
+    }
+
+    @keyframes co-fade {
+      0%   { opacity: 1; }
+      70%  { opacity: 1; }
+      100% { opacity: 0; }
+    }
   </style>
 </head>
 <body>
@@ -454,8 +499,7 @@
     /* =========================
        設定：Google Apps Script API URL
        ========================= */
-    const API_URL = "https://script.google.com/macros/s/AKfycby2ONfjn-yiAaq_R6ey4HvZG8aIhWf3sMWAuJHKs0hhzKZaqLUBLUs6XHy5W91OV9Zb/exec"; 
-    // 例: "https://script.google.com/macros/s/XXXXXXXXXXXX/exec"
+    const API_URL = "https://script.google.com/macros/s/AKfycby2ONfjn-yiAaq_R6ey4HvZG8aIhWf3sMWAuJHKs0hhzKZaqLUBLUs6XHy5W91OV9Zb/exec";
 
     /* =========================
        小さなユーティリティ
@@ -519,7 +563,7 @@
         kana,
         kanji: String(src.kanji || ""),
         sentence,
-        image: "",      // 必要になったら拡張
+        image: "",
         tags: tagList
       };
     }
@@ -663,6 +707,20 @@
       }
     }
 
+    /* 正解オーバーレイ表示 */
+    function showCorrectOverlay() {
+      const ov = el("#correctOverlay");
+      if (!ov) return;
+
+      ov.classList.remove("show");
+      void ov.offsetWidth;  // reflow
+      ov.classList.add("show");
+
+      setTimeout(() => {
+        ov.classList.remove("show");
+      }, 900);
+    }
+
     function check(showOnly = false) {
       const it = currentItem();
       if (!it) return;
@@ -678,6 +736,8 @@
 
       if (ok) {
         box.innerHTML = `◎ いいね！ <strong style="font-size:20px">${it.kanji}</strong> を しっかり おぼえたね。`;
+        // 正解演出
+        showCorrectOverlay();
       } else {
         box.innerHTML = `× <strong>${ans || "（まだ かいていない よ）"}</strong> → せいかい は <strong style="font-size:20px">${it.kanji}</strong> だよ。`;
       }
@@ -755,7 +815,6 @@
     function renderTrace(ch) {
       const faint = el("#traceFaint");
       if (!traceCanvas || !traceCtx || !faint) return;
-      // キャンバスをクリア
       traceCtx.clearRect(0,0,traceCanvas.width,traceCanvas.height);
       faint.textContent = ch ? ch : "";
     }
@@ -852,18 +911,17 @@
        初期化
        ========================= */
     document.addEventListener("DOMContentLoaded", async () => {
-      initTraceCanvas();             // 大きい書き枠
-      load();                        // 保存データ
-      initFromKanjiItemsIfNeeded();  // 内蔵 KANJI_ITEMS
+      initTraceCanvas();
+      load();
+      initFromKanjiItemsIfNeeded();
       renderTable();
       pickBatch();
       renderCurrent();
-
-      // Google Sheets から最新データを上書き
       await syncFromSheet();
     });
-  </script>  
-<!-- 正解オーバーレイ -->
+  </script>
+
+  <!-- 正解オーバーレイ -->
   <div id="correctOverlay">
     <div class="co-ring">〇</div>
     <div class="co-text">せいかい！</div>
